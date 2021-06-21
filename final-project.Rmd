@@ -1,0 +1,243 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r, include=FALSE}
+setwd("C:/Users/vctrj/OneDrive/Desktop/College Career/Graduate/Fall 2020/STAT 730/Final")
+```
+## Loading data
+```{r, warning = FALSE, message = FALSE}
+college.data <- read.csv("college_data_final.csv")
+college.data$CC_BASIC <- as.factor(college.data$CC_BASIC) # converting the types of universities as factors
+
+## str(college.data)
+## nrow(college.data)
+## ncol(college.data)
+## head(college.data)
+## tail(college.data)
+```
+
+## Explanatory Data Analysis
+We perform an explanatory data analysis to get a better understanding of the variables and relationships among them.
+```{r, warning = FALSE, message = FALSE}
+summary(college.data)
+# Histograms of all the variables
+par(mfrow= c(2,4))
+for (i in c(5:18)) {
+  hist(college.data[,i], 
+       main=paste0("Histogram of ",colnames(college.data[i])),
+       xlab=colnames(college.data[i]))
+  lines(college.data[,i], col="red")
+}
+dev.off() # reset par function
+
+# Scatter Plot Matrices
+library(car)
+for (i in list(5:9, 10:14, 15:18)) {
+  spm(college.data[,i])
+}
+# Co-variance and correlation matrix:
+cov.m <- cov(college.data[, 5:ncol(college.data)])
+cor.m <- cor(college.data[,5:ncol(college.data)])
+round(cov.m, 3) # co-variance matrix
+round(cor.m, 3) # co-relation matrix
+```
+
+## Applying Multivariate Analysis Methods:
+### 1. Principal Component Analysis (PCA)
+```{r, warning = FALSE, message = FALSE}
+# PCA on correlation matrix
+college.pc <- prcomp(college.data[,6:ncol(college.data)], 
+                     center = TRUE, scale. = TRUE)
+
+# eigenvalues of each principal component
+college.pc$sdev ^ 2
+
+# compute proportion of total variance explained by each component
+## Compute cumulative proportion of total variance 
+## explained by the components
+summary(college.pc)
+# library(factoextra)
+# fviz_eig(college.pc)
+
+par(mfrow=c(1,2))
+# How many PCs to choose?
+screeplot(college.pc, type = "l",ylim = c(0,9), npcs = 13, main = "Screeplot (for D&A)")
+abline(h = 1, col="red", lty=5)
+legend("topright", legend=c("Eigenvalue = 1"),
+       col=c("red"), lty=5, cex=0.6)
+
+# according to screeplot let's just choose 3 PCs
+# correlation between the principal components and original variables
+corr <- cor(college.data[6:ncol(college.data)], college.pc$x[,1:3])
+round(corr, 3)
+x <-round(corr, 3)
+names(dimnames(x)) <- list("", "Table 1S")
+x
+
+# New data-set for Classification and Discrimination
+college.data.a <- college.pc$x[,1:3]
+colnames(college.data.a) <- c("GRAD_RATE_6", "UNEMP_RATE", "UG_ENRLL")
+head(college.data.a)
+
+# For Multivariate Regression Analysis
+# PCA on correlation matrix
+college.pc <- prcomp(college.data[,c(-1:-5, -13, -16, -17)], 
+                     center = TRUE, scale. = TRUE)
+
+# eigenvalues of each principal component
+college.pc$sdev ^ 2
+
+##compute proportion of total variance explained by each component
+## Compute cumulative proportion of total variance 
+## explained by the components
+summary(college.pc)
+
+# How many PCs to choose?
+screeplot(college.pc, type = "l",ylim =c(0,9), npcs = 10, main = "Scree-plot (for MLM)")
+abline(h = 1, col="red", lty=5)
+legend("topright", legend=c("Eigenvalue = 1"),
+       col=c("red"), lty=5, cex=0.6)
+
+# according to scree-plot let's just choose 3 PCs
+# correlation between the principal components and original variables
+corr <- cor(college.data[,c(-1:-5, -13, -16, -17)], college.pc$x[,1:3])
+x <-round(corr, 3)
+names(dimnames(x)) <- list("", "Table 2")
+x
+
+# new data-set based on PCA
+college.data.b <- college.pc$x[, 1:3]
+colnames(college.data.b) <- c("SAT_AVG", "UNEMP_RATE", "UG_ENRL")
+college.data.c <- cbind(college.data[, c(13,16,17)], data.frame(college.data.b))
+# head(college.data.c)
+```
+
+**Results:**
+
+After running two PCAs, each for the subsequent analysis(Discrimination & Classification, Multivariate Regression), followed by a scree plot on our original data, we found out that the first, second, and third PCs simultaneously explained around 60%, 15%, and 10% of the variation in the data which altogether explained over 82% of the total variability. Only those PCs were chosen which had eigenvalue more than 1. Although the original data had 18 variables and 13 continuous variables, its dimensionality is significantly reduced to 3 variables with keeping maximum variability in the data.
+
+Table 1 and Table 2 from above show the correlation between the original variable and PCs that were respectively used for Discrimination and Classification and Multivariate regression analysis. The new PCs were named accordingly to those original variables with whom they had maximum absolute correlation. For instance, in table 1, PC1 was named GRAD_RATE_6.
+
+## 2. Discriminant and Classification Analysis
+```{r, warning = FALSE, message = FALSE}
+college.data.a1 <- data.frame(college.data[,4], college.data.a)
+colnames(college.data.a1)[1] <- colnames(college.data)[4]
+# green = R1, red = R2, blue = R3
+colors <- c("green", "red" ,"blue")[college.data[ , 4]]
+# new data-frame with jittered Class variable
+new_college <- cbind(jitter(as.integer(college.data[ , 4])),
+                     college.data.a)
+shapes = c(0,3,5) 
+shapes <- shapes[as.numeric(college.data.a1$CC_BASIC)]
+
+colnames(new_college)[1] <- colnames(college.data)[4] # old name to new variable
+pairs(new_college, pch = shapes, cex = 1, gap = 0, col = colors,
+      xaxt = "n", yaxt = "n")
+legend("bottom", fill = c("green", "red", "blue"), 
+       legend = c(levels(college.data$CC_BASIC)), horiz = T, cex = 0.6, 
+       xpd = T)
+mtext("Comparison among Types of Research Universities", line = 1)
+```
+
+**Results:**
+
+Before performing a classification and discrimination, the scatter plot of the new dataset consisting of all PCs was obtained. Just by eyeballing, it appeared as if the R1 and R3 universities are distinct from one another and R3 universities seemed overlapped with R1 and R3. After running the Linear Discriminant Analysis (LDA), we became more certain that some variables within our data differentiate among the types of universities.
+
+```{r, warning = FALSE, message = FALSE}
+library(MASS)
+ld <- lda(CC_BASIC ~ ., data = college.data.a1, CV = F)
+ld
+loading <- as.matrix(college.data.a1[ , -1]) %*% ld$scaling
+plot(loading, col = c("green", "red", "blue")[ college.data.a1[ , 1] ],
+  pch = shapes, cex = 0.8,
+  xlab = "First linear discriminator",
+  ylab = "Second linear discriminator")
+for (i in c("R1", "R2", "R3")) { # add class number to each centroid
+  centx <- mean(loading[college.data.a1[,1] == i, ] [ , 1] )
+  centy <- mean(loading[college.data.a1[,1] == i, ] [ , 2] )
+  text(centx, centy, i, cex = 1.5)
+}
+
+# using linear discrimination analysis
+ld1 <- lda(CC_BASIC ~ ., data = college.data.a1, CV = T)
+mat <- table(college.data.a1$CC_BASIC, ld1$class)
+
+# Estimated AER using holdout procedure
+n <- sum(mat)
+eaer <- (n - sum(diag(mat))) / n
+eaer
+```
+
+**Results:**
+
+In the above plot, we applied the linear discrimination analysis to the university data and plot the resulting groups in colors and identifying class number. The first and second discriminators are linear combinations of variables that best discriminate between the three research categories of the colleges. This figure illustrates a clear distinction between only the two (R1 and R3) of the three types of universities. And R2 universities seem to have an intersection with both R1 and R3. Based on the confusion matrix in Fig VII, the LDA model was overall successful in classifying the types of universities with around 28% AER.
+
+
+#### 3. Multivariate Regression Analysis
+```{r, warning = FALSE, message = FALSE}
+levels(college.data.a1$CC_BASIC) <- c(1:3)
+college.data.c1 <- data.frame((college.data.a1$CC_BASIC), college.data.c)
+colnames(college.data.c1)[1] <- c("CC_BASIC")
+college.mlm.1 <- lm(cbind(GRAD_RATE_6, GRAD_DEBT_MDN, MD_EARN_10) ~ ., 
+                  data = college.data.c1)
+library(car)
+Manova(college.mlm.1, type="II",test = c("Wilks"))
+
+# The following R function (pred.mlm) used for computing Confidence Intervals and Prediction Intervals from a Multivariate Regression Analysis is extracted from Dr. Nathaniel E. Helwig's (Associate Professor of Psychology and Statistics at U of Minnesota Twin Cities) [lecture note] (http://users.stat.umn.edu/~helwig/notes/mvlr-Notes.pdf)
+
+pred.mlm <- function(object, newdata, level=0.95,
+                     interval = c("confidence", "prediction")){
+    form <- as.formula(paste("~",as.character(formula(object))[3]))
+    xnew <- model.matrix(form, newdata)
+    fit <- predict(object, newdata)
+    Y <- model.frame(object)[,1]
+    X <- model.matrix(object)
+    n <- nrow(Y)
+    m <- ncol(Y)
+    p <- ncol(X) - 1
+    sigmas <- colSums((Y - object$fitted.values)^2) / (n - p - 1)
+    fit.var <- diag(xnew %*% tcrossprod(solve(crossprod(X)), xnew))
+    if(interval[1]=="prediction") fit.var <- fit.var + 1
+    const <- qf(level, df1=m, df2=n-p-m) * m * (n - p - 1) / (n - p - m)
+    vmat <- (n/(n-p-1)) * outer(fit.var, sigmas)
+    lwr <- fit - sqrt(const) * sqrt(vmat)
+    upr <- fit + sqrt(const) * sqrt(vmat)
+    if(nrow(xnew)==1L){
+    ci <- rbind(fit, lwr, upr)
+    rownames(ci) <- c("fit", "lwr", "upr")
+    } else {
+    ci <- array(0, dim=c(nrow(xnew), m, 3))
+    dimnames(ci) <- list(1:nrow(xnew), colnames(Y), c("fit", "lwr", "upr") )
+    ci[,,1] <- fit
+    ci[,,2] <- lwr
+    ci[,,3] <- upr
+    }
+    ci
+}
+library(usefun) # to print an empty line
+for (i in 1:3) {
+# For a sample student with following features:
+newdata <- data.frame(CC_BASIC = factor(i, levels = c(1,2,3)), 
+                      SAT_AVG = median(college.data.c1$SAT_AVG), 
+                      UNEMP_RATE = median(college.data.c1$UNEMP_RATE), 
+                      UG_ENRL = median(college.data.c1$UG_ENRL))
+
+# 95% Confidence Interval
+print(paste0("CONFIDENCE INTERVAL for R", i))
+print(pred.mlm(college.mlm.1, newdata))
+print_empty_line(html.output = FALSE)
+}
+## 95% Prediction Interval
+## print(paste0("PREDICTION INTERVAL for R", i))
+## print(pred.mlm(college.mlm.1, newdata, interval="prediction"))
+## print_empty_line(html.output = FALSE)
+## }
+```
+
+**Results:**
+
+Interpreting the confidence interval for the mean graduation rate for a student in our example:
+
+With a confidence coefficient of 0.95, the mean graduation rate for the hypothetical student in an R1 school is somewhere between 61.6% to 63.06%.
